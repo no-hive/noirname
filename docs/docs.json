@@ -1,0 +1,39 @@
+{
+  "theme": "linden",
+  "name": "NoirName",
+  "colors": {
+    "primary": "#5298ff",
+    "light": "#a5c8ff",
+    "dark": "#3b7fe0"
+  },
+  "favicon": "/favicon.svg",
+  "$schema": "https://mintlify.com/docs.json",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Overview",
+        "pages": [
+          "introduction"
+        ]
+      },
+      {
+        "group": "Protocol",
+        "pages": [
+          "protocol/architecture",
+          "protocol/l1-contract",
+          "protocol/l2-contract",
+          "protocol/frontend-module",
+          "protocol/dapp-integration"
+        ]
+      },
+      {
+        "group": "Extra",
+        "pages": [
+          "contributing/how-to-contribute",
+          "contributing/changelog",
+          "contributing/brandbook"
+        ]
+      }
+    ]
+  }
+}
