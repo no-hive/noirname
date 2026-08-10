@@ -1,13 +1,13 @@
 {
-  "theme": "linden",
+  "$schema": "https://mintlify.com/docs.json",
   "name": "NoirName",
+  "theme": "linden",
   "colors": {
     "primary": "#5298ff",
     "light": "#a5c8ff",
     "dark": "#3b7fe0"
   },
   "favicon": "/favicon.svg",
-  "$schema": "https://mintlify.com/docs.json",
   "navigation": {
     "groups": [
       {

@@ -1,0 +1,94 @@
+---
+title: "1. L1 Contract"
+sidebarTitle: "1. L1 Contract"
+description: "Understand how the NoirName L1 contract verifies ENS ownership via the Universal Resolver and bridges only a compact hash to Aztec L2."
+mode: "wide"
+---
+
+The L1 contract is the trust anchor of the NoirName protocol. It does the one thing only Ethereum can do in this flow: check, on-chain, that a given address actually controls an ENS name. Everything else in the protocol is built on the guarantee this contract produces. Once it confirms ownership, it packages the result with the user's secret hash and sends a single compact hash across the bridge to Aztec — keeping the message small and ensuring no sensitive data travels over a public channel.
+
+<Info>
+  The L1 contract never sees the user's raw secret or plain ENS name. It works entirely with values derived by the frontend, so even a full transaction history reveals nothing about the underlying identity.
+</Info>
+
+## Responsibilities
+
+The contract has two sequential responsibilities: verify, then bridge.
+
+<Steps>
+  <Step title="Verify ENS ownership">
+    Call `verifyENSOwnership(derivedValue, secretHash)` with the values produced by the frontend module. The contract queries the ENS Universal Resolver using `derivedValue` — not a plain name — and confirms that the caller's address is the registered owner. If verification fails, the transaction reverts.
+
+    ```solidity
+    // Called by the user's wallet on Ethereum mainnet
+    noirNameL1.verifyENSOwnership(
+        derivedValue,   // resolver-compatible query value from frontend
+        secretHash      // hash of the user's secret; raw secret never sent
+    );
+    ```
+  </Step>
+  <Step title="Combine and hash">
+    After verification succeeds, the contract combines the verified ownership proof with the `secretHash` and hashes the result into a single field value. This hash is the only representation of the proof that will ever leave L1.
+
+    ```solidity
+    bytes32 proofHash = keccak256(abi.encode(ownershipProof, secretHash));
+    ```
+  </Step>
+  <Step title="Bridge the hash to Aztec L2">
+    Call `bridgeToL2(hash)` to dispatch the proof hash through the canonical Aztec message bridge. The L2 contract will receive this hash and hold it until the user claims the proof.
+
+    ```solidity
+    noirNameL1.bridgeToL2(proofHash);
+    // Emits a cross-chain message; raw name data and secret stay off the bridge
+    ```
+  </Step>
+</Steps>
+
+## Public API
+
+<CardGroup cols={2}>
+  <Card title="verifyENSOwnership(derivedValue, secretHash)" icon="circle-check" href="/protocol/l1-contract#public-api">
+    Queries the ENS Universal Resolver with `derivedValue` and confirms the caller controls the corresponding name. Reverts if ownership cannot be confirmed.
+
+    **Params:**
+
+    - `derivedValue` — resolver query value from the frontend
+    - `secretHash` — `hash(secret)`, produced client-side
+
+    **Returns:** `bytes32 ownershipProof`
+  </Card>
+
+  <Card title="bridgeToL2(hash)" icon="bridge" href="/protocol/l1-contract#public-api">
+    Sends the combined proof hash to Aztec via the canonical L1 → L2 message bridge. This is the only data that crosses the bridge — no names, no addresses, no raw secrets.
+
+    **Params:**
+
+    - `hash` — `keccak256(ownershipProof, secretHash)`
+
+    **Returns:** `bytes32 messageHash` (bridge message identifier)
+  </Card>
+</CardGroup>
+
+## Why Only a Hash Crosses the Bridge
+
+<Accordion title="What is the ENS Universal Resolver, and why use a derived value?">
+  The ENS Universal Resolver is a standard Ethereum contract that resolves any ENS name to its owner regardless of which resolver the name uses. NoirName passes a derived value — not the plain `*.eth` string — so that the query is semantically bound to the user's secret. An observer who sees the derived value on-chain cannot trivially reverse it to a readable ENS name.
+</Accordion>
+
+<Accordion title="Why not bridge the full name and proof?">
+  L1 → L2 messages on Aztec are public while in transit. Sending a raw ENS name would let anyone watching the bridge know which name is being registered on L2. Bridging only a hash keeps the linkage between Ethereum identity and Aztec activity invisible to outside observers.
+</Accordion>
+
+<Accordion title="What happens after the hash is bridged?">
+  The Aztec L2 contract stores the hash and waits. The user must separately submit the original `ensName` and `secret` directly to the L2 contract in a private Aztec transaction. The L2 contract re-derives the hash and compares — if they match, the proof is stored privately and ownership is confirmed without any public disclosure.
+</Accordion>
+
+## Security Considerations
+
+<Warning>
+  `verifyENSOwnership` uses `msg.sender` to confirm the caller owns the ENS name. If you are integrating this into a contract that calls NoirName on behalf of users, ensure you are not inadvertently substituting your contract address as the sender.
+</Warning>
+
+<Note>
+  ENS ownership can change after a proof is bridged. The L2 contract includes a proof-refresh mechanism; see the [L2 Contract](/protocol/l2-contract) page for details on how staleness is handled.
+</Note>

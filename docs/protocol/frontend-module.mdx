@@ -1,0 +1,83 @@
+---
+title: "3.1 NoirName Frontend"
+sidebarTitle: "3.1 Frontend Module"
+description: "Learn how the NoirName frontend module generates user secrets and derives ENS query values to keep identity private across the L1–L2 bridge."
+mode: "wide"
+---
+
+The frontend module is where privacy begins. Before anything touches a blockchain, your app generates a secret that only the user ever holds. That secret is what makes the entire protocol trustworthy: because only a hash of it is ever sent on-chain, no one watching the L1 → L2 bridge can steal a proof for a name they don't own. This module also handles the ENS query derivation logic, since the Universal Resolver expects a derived value — not a plain ENS name — and that transformation has to happen client-side.
+
+<Note>
+  Never transmit the raw secret to any contract or server. Only its hash leaves the browser. The original secret must stay in the user's session so they can complete the claim on Aztec L2.
+</Note>
+
+## How It Works
+
+When a user wants to prove ENS ownership, your frontend orchestrates two things before any contract is called: it creates a secret unique to this proof attempt, and it derives the query values the ENS Universal Resolver needs.
+
+<Steps>
+  <Step title="Generate the user's secret">
+    Call `generateSecret()` to produce a cryptographically random secret tied to this proof session. Store it securely in the user's browser session — you will need it again when the user submits the claim on L2.
+
+    ```typescript
+    import { generateSecret } from "@noirname/frontend";
+    
+    const secret = await generateSecret();
+    // secret: a random field element, kept client-side only
+    ```
+  </Step>
+  <Step title="Derive ENS query values">
+    Call `deriveENSQueryValues(ensName, secret)` to produce the derived value the L1 contract will use when querying the ENS Universal Resolver. This step binds the secret to the specific ENS name so that any mismatch fails verification on L1.
+
+    ```typescript
+    import { deriveENSQueryValues } from "@noirname/frontend";
+    
+    const { derivedValue, secretHash } = await deriveENSQueryValues(
+      "yourname.eth",
+      secret
+    );
+    
+    // derivedValue  → passed to the L1 contract for ENS resolution
+    // secretHash    → passed to the L1 contract; raw secret is NOT sent
+    ```
+  </Step>
+  <Step title="Pass values to the L1 contract">
+    Send `derivedValue` and `secretHash` to the L1 contract. At this point your app holds the original `ensName` and `secret` locally — keep them. The user will resubmit these originals directly to the Aztec L2 contract to complete the proof claim.
+  </Step>
+</Steps>
+
+## Public API
+
+<CardGroup cols={2}>
+  <Card title="generateSecret()" icon="key" href="/protocol/frontend-module#public-api">
+    Generates a cryptographically secure random secret for the current proof session. Returns a field element suitable for use in Noir circuits.
+
+    **Returns:** `Promise<Secret>`
+  </Card>
+
+  <Card title="deriveENSQueryValues(ensName, secret)" icon="arrow-right-arrow-left" href="/protocol/frontend-module#public-api">
+    Derives the resolver-compatible query value and the secret hash from a plain ENS name and a secret. Neither the raw name nor the raw secret leaves the client.
+
+    **Returns:** `Promise<{ derivedValue: Field, secretHash: Field }>`
+  </Card>
+</CardGroup>
+
+## Why the Frontend Holds the Originals
+
+<Accordion title="Why can't the L2 contract just read the ENS name from L1?">
+  The bridge only carries a hash. Sending raw name data over the L1 → L2 message would expose it publicly and increase bridge costs. Instead, the user resends the original `ensName` and `secret` directly to the Aztec L2 contract in a separate, private transaction. The L2 contract hashes those inputs itself and checks that the result matches what arrived from L1 — confirming both ownership and knowledge of the secret without revealing either on a public channel.
+</Accordion>
+
+<Accordion title="What happens if the user loses their secret before claiming on L2?">
+  The proof attempt is abandoned. The hash that was bridged to L2 will never be claimable, because no one can produce the original preimage. The user must start a new proof session with a fresh `generateSecret()` call.
+</Accordion>
+
+## Security Considerations
+
+<Warning>
+  Do not persist the secret in `localStorage` without encryption. If an attacker can read the secret, they can claim the proof on L2 on behalf of the user. Use a session-scoped in-memory store or an encrypted vault.
+</Warning>
+
+<Tip>
+  Display a clear UI prompt reminding users not to close the tab between the L1 transaction and the L2 claim step. The secret only lives in memory during this window.
+</Tip>

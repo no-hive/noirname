@@ -1,0 +1,195 @@
+---
+title: "NoirName Architecture"
+sidebarTitle: "Architecture"
+description: "A short overview of the NoirName protocol flow and a map of every component, from the frontend module and L1 contract to the L2 contract and dApp integration."
+mode: "wide"
+---
+
+NoirName is built as four cooperating parts: a frontend module that generates the user's secret, an L1 contract that verifies ENS ownership on Ethereum, an L2 contract that stores and exposes proofs privately on Aztec, and a dApp integration module that any Aztec contract can use to read those proofs.
+
+## Flow at a glance
+
+1. The **frontend module** creates a user secret and derives the ENS query values and secret hash.
+2. The **L1 contract** checks ENS ownership through the Universal Resolver and bridges a compact commitment to Aztec.
+3. The **L2 contract** receives the commitment. The user claims it privately with their secret, and the proof is stored on L2.
+4. Any Aztec dApp uses the **integration module** to read the verified proof, without learning who owns the ENS name.
+
+The result: public ownership verification on L1, fully private consumption on L2, and no link between the two sides beyond a hash only the user can open.
+
+## Explore the components
+
+<CardGroup cols={2}>
+  <Card title="Frontend Module" icon="window-restore" href="/protocol/frontend-module">
+    Generate the user secret and derive ENS query values that keep identity private across the bridge.
+  </Card>
+
+  <Card title="L1 Contract" icon="ethereum" href="/protocol/l1-contract">
+    Verify ENS ownership on Ethereum via the Universal Resolver and bridge a commitment to Aztec.
+  </Card>
+
+  <Card title="L2 Contract" icon="lock" href="/protocol/l2-contract">
+    Receive bridged commitments, validate private claims, and expose proofs to other Aztec contracts.
+  </Card>
+
+  <Card title="dApp Integration" icon="plug" href="/protocol/dapp-integration">
+    Drop NoirName into any Aztec contract to gate features on anonymous ENS ownership.
+  </Card>
+</CardGroup>
+
+## End-to-End Flow
+
+Understanding the complete NoirName flow will help you build integrations that are both correct and private. The protocol spans three environments, your user's browser, Ethereum L1, and Aztec L2, and each handoff is designed so that no single point in the journey can expose who owns which ENS name. This section walks you through every step in sequence and explains what each component does and why.
+
+### Flow overview
+
+```text
+  Browser (Frontend)
+        │
+        │  generateSecret()
+        │  deriveENSQueryValues(ensName, secret)
+        │
+        ▼
+  Ethereum L1 Contract
+        │
+        │  verifyENSOwnership(derivedValue, secretHash)
+        │  bridgeToL2(hash)
+        │
+        ▼
+  [L1 → L2 Message Bridge, hash only]
+        │
+        ▼
+  Aztec L2 Contract
+        │
+        │  receiveFromL1(hash)          ← bridge delivery
+        │  claimProof(nameData, secret) ← private user tx
+        │  readProof(address, name)     ← consumed by dApps
+        │
+        ▼
+  Your Aztec Contract
+        │
+        └─ checkNoirNameProof(address, name) → bool
+```
+
+### Step-by-step walkthrough
+
+<Steps>
+  <Step title="Generate a secret and derive ENS query values (Frontend)">
+    The user opens your app and initiates an ENS proof. Your frontend calls `generateSecret()` to produce a random secret that will bind this proof attempt to the user. It then calls `deriveENSQueryValues(ensName, secret)` to produce two values:
+
+    - **`derivedValue`**, a resolver-compatible representation of the ENS name, tied to the secret
+    - **`secretHash`**, `hash(secret)`, safe to send on-chain
+
+    The raw `ensName` and `secret` stay in memory. The user will need them again in Step 4.
+
+    ```typescript
+    const secret = await generateSecret();
+    const { derivedValue, secretHash } = await deriveENSQueryValues(
+      "yourname.eth",
+      secret
+    );
+    ```
+  </Step>
+  <Step title="Verify ENS ownership on L1 (Ethereum)">
+    The user's wallet submits a transaction to the NoirName L1 contract, passing `derivedValue` and `secretHash`. The contract queries the ENS Universal Resolver to confirm the caller owns the name, then combines the ownership proof with `secretHash` into a single hash.
+
+    ```solidity
+    noirNameL1.verifyENSOwnership(derivedValue, secretHash);
+    // → bytes32 proofHash = keccak256(ownershipProof, secretHash)
+    ```
+
+    If the caller does not own the name, the transaction reverts here and nothing proceeds.
+  </Step>
+  <Step title="Bridge the proof hash to Aztec L2">
+    Still within the same L1 transaction (or a chained call), the contract calls `bridgeToL2(proofHash)`. Only the 32-byte hash travels over the bridge, no ENS name, no Ethereum address, no secret.
+
+    ```solidity
+    noirNameL1.bridgeToL2(proofHash);
+    // Cross-chain message dispatched; bridge message ID returned
+    ```
+
+    The Aztec bridge delivers this message by calling `receiveFromL1(hash)` on the L2 contract. The hash is now stored in L2 public state as a pending, unclaimed proof.
+  </Step>
+  <Step title="Claim the proof on Aztec L2 (private transaction)">
+    The user switches to the Aztec network and submits a **private** transaction calling `claimProof(nameData, secret)` with the original inputs that have been in browser memory since Step 1. The L2 contract re-derives the hash and checks it against the pending set.
+
+    ```noir
+    l2Contract.claimProof(nameData, secret);
+    // Hashes inputs → matches pending hash → stores proof privately
+    ```
+
+    On success, the proof is written to Aztec's private note tree under the user's Aztec address. Nothing about the claim, not the name, not the address, is visible in the public transaction log.
+
+    <Warning>
+      The user must complete this step in the same session as Step 1, or have securely preserved the `secret`. A lost secret means the pending hash on L2 can never be claimed.
+    </Warning>
+  </Step>
+  <Step title="Consume the proof in your Aztec contract">
+    With the proof stored, any Aztec contract that imports the NoirName integration module can now gate logic on ENS ownership. Call `checkNoirNameProof(address, name)` from a private function, it returns `true` if a valid, current proof exists.
+
+    ```noir
+    use noirname::integration::checkNoirNameProof;
+    
+    #[aztec(private)]
+    fn restricted_action(caller: AztecAddress) {
+        let verified = checkNoirNameProof(caller, "yourname.eth");
+        assert(verified, "Valid NoirName proof required");
+    
+        // Proceed with gated logic
+    }
+    ```
+  </Step>
+</Steps>
+
+### What each layer knows
+
+<CardGroup cols={3}>
+  <Card title="L1 (Public)" icon="ethereum" href="/protocol/l1-contract">
+    Knows the caller's Ethereum address owns an ENS name. Does **not** know the secret or which Aztec address will claim the proof.
+  </Card>
+
+  <Card title="L2 Bridge (Public)" icon="bridge" href="/protocol/architecture#bridge-the-proof-hash-to-aztec-l2">
+    Carries only a 32-byte hash. Reveals nothing about the underlying name, address, or secret.
+  </Card>
+
+  <Card title="Aztec L2 (Private)" icon="lock" href="/protocol/l2-contract">
+    Stores the proof privately. The consuming contract receives only a boolean, never the name or the L1 address.
+  </Card>
+</CardGroup>
+
+## Frequently asked questions
+
+<Accordion title="How long does the full flow take?">
+  The main variable is L1 → L2 message delivery, which depends on Aztec's bridge finality window. Once the hash arrives on L2, the claim transaction is near-instant. Plan for a few minutes between the L1 submission and the point where `claimProof` can succeed.
+</Accordion>
+
+<Accordion title="Can the same ENS name be proved by multiple Aztec addresses?">
+  No. The L1 contract ties the proof to the `msg.sender` at the time of verification. Each proof attempt is specific to the Ethereum address that submitted the L1 transaction. Different Aztec addresses would require separate L1 transactions from the corresponding Ethereum address.
+</Accordion>
+
+<Accordion title="What happens if the ENS name is transferred after the proof is claimed?">
+  The proof stored on L2 has a TTL. When `readProof` or `checkNoirNameProof` is called after the TTL expires, the proof is marked stale and returns `false`. The original owner would need to go through the full flow again to renew it, and if the name has been transferred, the new owner on L1 is the only address that can issue a fresh proof.
+</Accordion>
+
+<Accordion title="Do I need to run any infrastructure to use NoirName?">
+  No. The L1 and L2 contracts are deployed by the NoirName team. You import the frontend SDK and the Aztec integration crate, then call the public API surfaces described in the individual component pages. No nodes, relayers, or off-chain services required on your end.
+</Accordion>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Frontend Module" icon="browser" href="/protocol/frontend-module">
+    Detailed reference for `generateSecret()` and `deriveENSQueryValues()`.
+  </Card>
+
+  <Card title="L1 Contract" icon="file-contract" href="/protocol/l1-contract">
+    How ENS verification and bridge dispatch work on Ethereum.
+  </Card>
+
+  <Card title="L2 Contract" icon="lock" href="/protocol/l2-contract">
+    Private proof storage and the claim lifecycle on Aztec.
+  </Card>
+
+  <Card title="dApp Integration" icon="plug" href="/protocol/dapp-integration">
+    Drop `checkNoirNameProof` into your own Aztec contract.
+  </Card>
+</CardGroup>

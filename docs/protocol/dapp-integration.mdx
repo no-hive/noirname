@@ -1,0 +1,122 @@
+---
+title: "3.2 dApp Integration"
+sidebarTitle: "3.2 dApp Integration"
+description: "Drop the NoirName integration module into any Aztec contract to gate features on anonymous ENS ownership without exposing user identity."
+mode: "wide"
+---
+
+The dApp integration module is the piece you actually ship in your own Aztec contract. It wraps the `readProof` call from the NoirName L2 contract into a single importable function — `checkNoirNameProof` — so you can add ENS-gated logic to whitelists, anonymous social features, private donation flows, or any other use case without writing any NoirName internals yourself. Critically, your contract never learns the user's Ethereum address or ENS name; it only learns whether a valid proof exists.
+
+<Tip>
+  You don't need to deploy or manage any NoirName contracts. Import the integration module, call `checkNoirNameProof`, and the module handles communication with the deployed L2 contract for you.
+</Tip>
+
+## Installation
+
+Add the NoirName integration crate to your Aztec project:
+
+```toml
+# Nargo.toml
+[dependencies]
+noirname = { git = "https://github.com/noirname/aztec-integration", tag = "v1.0.0" }
+```
+
+## Usage
+
+<Steps>
+  <Step title="Import the module">
+    Bring `checkNoirNameProof` into scope in your Noir contract file.
+
+    ```noir
+    use noirname::integration::checkNoirNameProof;
+    ```
+  </Step>
+  <Step title="Call checkNoirNameProof in your private function">
+    Pass the user's Aztec address and the ENS name you want to verify. The function returns `true` if a valid, current NoirName proof exists for that combination, and `false` otherwise.
+
+    ```noir
+    #[aztec(private)]
+    fn my_gated_action(caller: AztecAddress, ens_name: Field) {
+        let has_proof = checkNoirNameProof(caller, ens_name);
+        assert(has_proof, "NoirName proof required");
+    
+        // Your logic here — only reachable by holders of a valid proof
+    }
+    ```
+  </Step>
+  <Step title="Handle the false case gracefully">
+    If `checkNoirNameProof` returns `false`, the proof is either missing or stale. Prompt the user to complete or refresh their NoirName proof before retrying.
+
+    ```noir
+    if !has_proof {
+        // Emit a note or return an error — do not revert if you want
+        // to give the caller a useful signal rather than a silent failure
+    }
+    ```
+  </Step>
+</Steps>
+
+## Public API
+
+<CardGroup cols={1}>
+  <Card title="checkNoirNameProof(address, name)" icon="shield-check" href="/protocol/dapp-integration#public-api">
+    Reads the NoirName L2 contract to determine whether `address` holds a valid proof for `name`. Proof freshness is checked automatically — a stale proof returns `false`.
+
+    **Params:**
+
+    - `address` — `AztecAddress` of the user to check
+    - `name` — `Field` representing the ENS name
+
+    **Returns:** `bool`
+
+    **Visibility:** Must be called from a `#[aztec(private)]` context.
+  </Card>
+</CardGroup>
+
+## Example Use Cases
+
+<CardGroup cols={2}>
+  <Card title="ENS-gated Whitelist" icon="list-check" href="/protocol/dapp-integration#usage">
+    Restrict contract access to holders of a specific ENS name or subdomain. No mapping of Ethereum addresses to Aztec addresses needed — the proof does the linking privately.
+  </Card>
+
+  <Card title="Anonymous Social Features" icon="users" href="/protocol/dapp-integration#usage">
+    Build reputation, voting, or attestation systems where participants prove ENS ownership without doxxing their L1 wallet or linking it to their Aztec activity.
+  </Card>
+
+  <Card title="Private Donations" icon="hand-holding-heart" href="/protocol/dapp-integration#usage">
+    Accept donations from verified ENS holders while keeping donor identity hidden from the public and from the contract itself.
+  </Card>
+
+  <Card title="Credential Gating" icon="id-card" href="/protocol/dapp-integration#usage">
+    Use an ENS name as a stand-in for off-chain credentials (e.g., a DAO membership subdomain) and gate on-chain actions without an oracle or identity provider.
+  </Card>
+</CardGroup>
+
+## Configuration
+
+<ParamField path="noirname.l2_contract_address" type="AztecAddress" required>
+  The deployed address of the NoirName L2 contract on your target Aztec network. Set this in your contract's initializer or as a constructor parameter.
+</ParamField>
+
+<ParamField path="noirname.proof_ttl" default="86400" type="u64">
+  Time-to-live for cached proof validity in seconds. After this window, `checkNoirNameProof` triggers a freshness check against stored proof state. Defaults to 24 hours.
+</ParamField>
+
+## Important Constraints
+
+<Warning>
+  `checkNoirNameProof` must be called from a **private** function. Calling it from a public Aztec function would expose which address–name pair is being checked, undermining the privacy guarantee.
+</Warning>
+
+<Note>
+  The integration module does not store any state in your contract. All proof data lives in the NoirName L2 contract. Your contract only reads a boolean result.
+</Note>
+
+<Accordion title="Can I check proofs for multiple ENS names in a single transaction?">
+  Yes. Call `checkNoirNameProof` once for each name you want to verify. Each call is independent and adds its own constraint to your circuit. Keep in mind that multiple calls will increase proof generation time proportionally.
+</Accordion>
+
+<Accordion title="Does my contract need to know when a proof was issued?">
+  No. The TTL-based freshness check inside `readProof` handles this transparently. If you need stricter freshness guarantees — for example, requiring a proof issued within the last hour — you can compare the proof's timestamp note against `context.timestamp()` after the check returns `true`.
+</Accordion>
