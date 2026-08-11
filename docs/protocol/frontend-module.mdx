@@ -2,7 +2,6 @@
 title: "3.1 NoirName Frontend"
 sidebarTitle: "3.1 Frontend Module"
 description: "Learn how the NoirName frontend module generates user secrets and derives ENS query values to keep identity private across the L1–L2 bridge."
-mode: "wide"
 ---
 
 The frontend module is where privacy begins. Before anything touches a blockchain, your app generates a secret that only the user ever holds. That secret is what makes the entire protocol trustworthy: because only a hash of it is ever sent on-chain, no one watching the L1 → L2 bridge can steal a proof for a name they don't own. This module also handles the ENS query derivation logic, since the Universal Resolver expects a derived value — not a plain ENS name — and that transformation has to happen client-side.

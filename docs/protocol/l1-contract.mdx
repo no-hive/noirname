@@ -2,7 +2,6 @@
 title: "1. L1 Contract"
 sidebarTitle: "1. L1 Contract"
 description: "Understand how the NoirName L1 contract verifies ENS ownership via the Universal Resolver and bridges only a compact hash to Aztec L2."
-mode: "wide"
 ---
 
 The L1 contract is the trust anchor of the NoirName protocol. It does the one thing only Ethereum can do in this flow: check, on-chain, that a given address actually controls an ENS name. Everything else in the protocol is built on the guarantee this contract produces. Once it confirms ownership, it packages the result with the user's secret hash and sends a single compact hash across the bridge to Aztec — keeping the message small and ensuring no sensitive data travels over a public channel.
