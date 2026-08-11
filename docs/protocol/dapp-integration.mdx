@@ -2,7 +2,6 @@
 title: "3.2 dApp Integration"
 sidebarTitle: "3.2 dApp Integration"
 description: "Drop the NoirName integration module into any Aztec contract to gate features on anonymous ENS ownership without exposing user identity."
-mode: "wide"
 ---
 
 The dApp integration module is the piece you actually ship in your own Aztec contract. It wraps the `readProof` call from the NoirName L2 contract into a single importable function — `checkNoirNameProof` — so you can add ENS-gated logic to whitelists, anonymous social features, private donation flows, or any other use case without writing any NoirName internals yourself. Critically, your contract never learns the user's Ethereum address or ENS name; it only learns whether a valid proof exists.

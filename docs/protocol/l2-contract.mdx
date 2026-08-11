@@ -2,7 +2,6 @@
 title: "2. Aztec L2 Contract"
 sidebarTitle: "2. Aztec Contract"
 description: "Explore how the NoirName Aztec L2 contract receives bridged hashes, validates user claims privately, and exposes proofs to other contracts."
-mode: "wide"
 ---
 
 The L2 contract is where anonymous ENS ownership becomes a usable on-chain primitive. Running on Aztec, it receives the hash sent from Ethereum, waits for the user to privately supply their original inputs, and stores the resulting proof in Aztec's private state — invisible to anyone who isn't explicitly granted access. Other contracts can then read that proof to gate their own logic, without ever learning the user's Ethereum address or ENS name.
