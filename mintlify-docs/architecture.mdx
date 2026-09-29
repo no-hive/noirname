@@ -1,0 +1,22 @@
+---
+title: "Architecture"
+description: "How an ENS ownership check on Ethereum leads to a private claim on Aztec."
+---
+
+# Architecture
+
+1. **Connect an Ethereum wallet and choose an ENS name.** The L1 contract uses the ENS Universal Resolver to check ownership.
+2. **Commit to a secret.** The L1 contract sends a commitment derived from the secret and name through Ethereum-to-Aztec messaging. The secret itself stays with the user.
+3. **Wait for the message on Aztec.** The L2 contract consumes it with `consume_l1_to_l2_message`.
+4. **Connect an Aztec wallet and claim.** The user supplies the secret to create a private ownership record.
+5. **Verify in an app.** Aztec applications can use the ownership record for name-based checks without relying on the public Ethereum wallet for each action.
+
+## Components
+
+| Component | Role |
+| --- | --- |
+| Frontend / future widget | Leads the user through Ethereum connection, ownership proof, message delivery, Aztec connection, claim, and verification. |
+| Ethereum L1 contract | Checks ENS ownership via the Universal Resolver, sends the commitment to L2, and offers a simpler public ownership read interface for developers. |
+| Aztec L2 contract | Consumes the L1 message and uses the secret to create a private claim record. |
+
+The Ethereum ownership check and its transaction are public. This page describes the intended flow; contract interfaces and deployment details should be documented after implementation is verified. See the [repository](https://github.com/no-hive/noirname) for source code.
