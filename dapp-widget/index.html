@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NoirName</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.4/ethers.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0D1017;
+    --panel:#12151D;
+    --border:#262B36;
+    --text:#E7E9EE;
+    --muted:#6B7180;
+    --faint:#363C4A;
+    --accent:#8B7FF5;
+    --green:#4ADE80;
+    --red:#F87171;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    font-size:15px;
+    line-height:1.5;
+    min-height:100vh;
+  }
+  .wrap{max-width:440px;margin:0 auto;padding:56px 24px 100px;}
+  h1{font-size:20px;font-weight:600;margin:0 0 32px;}
+
+  .secret{
+    border:1px solid var(--border);
+    border-radius:4px;
+    padding:14px 16px;
+    margin-bottom:32px;
+  }
+  .secret .lbl{font-size:13px;color:var(--muted);margin-bottom:6px;}
+  .secret .row{display:flex;justify-content:space-between;align-items:center;gap:12px;}
+  .secret .val{font-family:'JetBrains Mono',monospace;font-size:14.5px;color:var(--text);word-break:break-all;}
+  .secret .val.empty{color:var(--muted);}
+  .copy{
+    font-family:'Inter',sans-serif;font-size:13px;color:var(--muted);background:none;
+    border:1px solid var(--border);border-radius:3px;cursor:pointer;padding:5px 10px;flex-shrink:0;
+  }
+  .copy:hover{color:var(--text);border-color:var(--faint);}
+
+  .track{display:flex;align-items:center;margin-bottom:28px;}
+  .node{
+    width:26px;height:26px;border-radius:50%;flex-shrink:0;
+    border:1px solid var(--border);background:var(--panel);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);
+  }
+  .node.active{border-color:var(--accent);color:var(--accent);}
+  .node.done{border-color:var(--green);color:var(--green);}
+  .line{flex:1;height:1px;background:var(--border);margin:0 4px;}
+  .line.done{background:var(--green);opacity:.4;}
+
+  .panel{
+    border:1px solid var(--border);
+    border-radius:4px;
+    padding:22px;
+  }
+  .panel .step-body{display:none;}
+  .panel .step-body.current{display:block;}
+  .step-label{font-size:15px;margin-bottom:16px;}
+
+  input[type=text]{
+    width:100%;background:var(--bg);border:1px solid var(--border);
+    color:var(--text);font-family:'JetBrains Mono',monospace;font-size:14px;
+    padding:9px 11px;border-radius:3px;margin-bottom:14px;
+  }
+  input[type=text]::placeholder{color:var(--muted);}
+  input[type=text]:focus{outline:none;border-color:var(--faint);}
+
+  button.action{
+    font-family:'Inter',sans-serif;font-size:14px;font-weight:500;
+    background:var(--text);color:var(--bg);border:none;border-radius:3px;
+    padding:10px 18px;cursor:pointer;
+  }
+  button.action:hover{opacity:.85;}
+  button.action:disabled{background:var(--faint);color:var(--muted);cursor:not-allowed;}
+  button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+  .skip{
+    display:block;font-family:'Inter',sans-serif;font-size:13px;color:var(--muted);
+    background:none;border:none;cursor:pointer;padding:0;margin-top:14px;
+    text-decoration:underline;text-underline-offset:2px;
+  }
+  .skip:hover{color:var(--text);}
+
+  .status{font-size:13.5px;color:var(--muted);margin-top:12px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+  .status .dot{width:5px;height:5px;border-radius:50%;background:var(--accent);animation:pulse 1s infinite;}
+  .status a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;}
+  .status.err{color:var(--red);}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.25;}}
+  @media (prefers-reduced-motion:reduce){.status .dot{animation:none;}}
+
+  .hint{font-size:13px;color:var(--muted);margin:-6px 0 14px;font-family:'JetBrains Mono',monospace;}
+  .hint.after{margin:14px 0 0;font-family:'Inter',sans-serif;}
+
+  .wallets{display:flex;flex-direction:column;gap:8px;margin-top:14px;}
+  .wallets button{
+    display:flex;align-items:center;gap:10px;text-align:left;
+    font-family:'Inter',sans-serif;font-size:14px;color:var(--text);
+    background:var(--bg);border:1px solid var(--border);border-radius:3px;
+    padding:9px 12px;cursor:pointer;
+  }
+  .wallets button:hover{border-color:var(--faint);}
+  .wallets img{width:20px;height:20px;border-radius:4px;}
+
+  .verify-out{font-size:14px;color:var(--green);margin-top:16px;display:none;}
+
+  .back-btn{
+    font-family:'Inter',sans-serif;font-size:14px;font-weight:600;color:var(--accent);
+    background:none;border:1.5px solid var(--accent);border-radius:3px;
+    cursor:pointer;padding:9px 18px;margin-top:20px;display:none;
+  }
+  .back-btn:hover{background:var(--accent);color:var(--bg);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>NoirName</h1>
+
+  <div class="secret">
+    <div class="lbl">Secret — copy it if you'll reload the page</div>
+    <div class="row">
+      <div class="val empty" id="secret-value">not generated yet</div>
+      <button class="copy" onclick="copySecret()">Copy</button>
+    </div>
+  </div>
+
+  <div class="track" id="track"></div>
+
+  <div class="panel">
+
+    <div class="step-body current" id="step1">
+      <div class="step-label">Connect Ethereum wallet</div>
+      <button class="action" id="connect-btn" onclick="connectEth()">Connect Ethereum wallet</button>
+      <div class="wallets" id="wallet-list"></div>
+      <div class="status" id="s1-status"></div>
+      <button class="skip" onclick="skipToClaim()">I already have a secret</button>
+    </div>
+
+    <div class="step-body" id="step2">
+      <div class="step-label">Prove ownership</div>
+      <div class="hint" id="s2-wallet"></div>
+      <input type="text" id="ens-input" placeholder="yourname.eth" oninput="checkEns()" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button class="action" id="prove-btn" onclick="proveOwnership()" disabled>Prove ownership</button>
+      <div class="status" id="s2-status"></div>
+    </div>
+
+    <div class="step-body" id="step3">
+      <div class="step-label">Waiting for proof on Aztec</div>
+      <div class="status"><span class="dot"></span>Waiting for delivery — <span id="wait-count">5</span>s</div>
+      <div class="status" id="s3-status"></div>
+    </div>
+
+    <div class="step-body" id="step4">
+      <div class="step-label">Connect Aztec wallet</div>
+      <button class="action" onclick="connectAztec()">Connect Aztec wallet</button>
+    </div>
+
+    <div class="step-body" id="step5">
+      <div class="step-label">Claim</div>
+      <input type="text" id="claim-secret-input">
+      <button class="action" onclick="claim()">Claim</button>
+      <div class="status" id="s5-status"></div>
+    </div>
+
+    <div class="step-body" id="step6">
+      <div class="step-label">Verify</div>
+      <button class="action" onclick="verify()">Verify ownership</button>
+      <div class="verify-out" id="verify-out">✓ Valid NoirName proof found for this account.</div>
+      <button class="back-btn" id="back-btn" onclick="resetApp()">Back to app</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ------------------------------------------------------------------ *
+ * Config — fill in after deploying contracts/eth/src/NoirName.sol
+ * ------------------------------------------------------------------ */
+const CONFIG = {
+  chainId: 11155111,                              // Sepolia. Mainnet = 1
+  chainName: 'Sepolia',
+  contract: '',                                   // NoirName L1 address. Empty = check-only mode (nothing is sent)
+  explorerTx: 'https://sepolia.etherscan.io/tx/', // Mainnet: https://etherscan.io/tx/
+};
+
+const ABI = [
+  'function prove(string name, bytes32 secretHash) returns (bytes32 key, uint256 index)',
+  'function ownsName(address account, string name) view returns (bool)',
+  'function resolvedAddress(string name) view returns (address)',
+  'event NameProven(bytes32 indexed node, bytes32 messageKey, uint256 leafIndex)',
+  'error InvalidName()',
+  'error NotNameController()',
+  'error InvalidSecretHash()',
+  'error L2NotConfigured()',
+];
+
+const ERRORS = {
+  InvalidName: 'This name is not a valid ENS name.',
+  NotNameController: "This name doesn't resolve to your connected wallet.",
+  InvalidSecretHash: 'Secret hash is out of range. Reload and try again.',
+  L2NotConfigured: 'The Aztec side of the contract is not configured yet.',
+};
+
+/* ------------------------------------------------------------------ *
+ * State
+ * ------------------------------------------------------------------ */
+let ethAddr, ethProvider, ethSigner, aztecAddr, secret, current = 1;
+let lastProof = null; // { name, node, messageKey, leafIndex, txHash }
+const TOTAL = 6;
+
+const $ = id => document.getElementById(id);
+const short = a => a.slice(0, 6) + '…' + a.slice(-4);
+const hexOf = n => '0x' + n.toString(16);
+
+function randHex(len){
+  let s = '0x';
+  for(let i=0;i<len;i++) s += Math.floor(Math.random()*16).toString(16);
+  return s;
+}
+
+function setStatus(id, html, isErr){
+  const el = $(id);
+  el.className = 'status' + (isErr ? ' err' : '');
+  el.innerHTML = html;
+}
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ------------------------------------------------------------------ *
+ * Stepper (unchanged from template)
+ * ------------------------------------------------------------------ */
+function renderTrack(){
+  const track = $('track');
+  track.innerHTML = '';
+  for(let i=1;i<=TOTAL;i++){
+    const node = document.createElement('div');
+    node.className = 'node' + (i===current ? ' active' : i<current ? ' done' : '');
+    node.textContent = i<current ? '✓' : i;
+    track.appendChild(node);
+    if(i<TOTAL){
+      const line = document.createElement('div');
+      line.className = 'line' + (i<current ? ' done' : '');
+      track.appendChild(line);
+    }
+  }
+}
+
+function goToStep(n){
+  current = n;
+  document.querySelectorAll('.step-body').forEach(el=>el.classList.remove('current'));
+  $('step'+n).classList.add('current');
+  renderTrack();
+}
+
+/* ------------------------------------------------------------------ *
+ * Step 1 — real Ethereum wallet connection (EIP-6963 + window.ethereum)
+ * ------------------------------------------------------------------ */
+const discovered = new Map();
+window.addEventListener('eip6963:announceProvider', e => discovered.set(e.detail.info.uuid, e.detail));
+window.dispatchEvent(new Event('eip6963:requestProvider'));
+
+function availableWallets(){
+  const list = [...discovered.values()];
+  if(!list.length && window.ethereum){
+    list.push({ info:{ name:'Browser wallet', icon:'' }, provider: window.ethereum });
+  }
+  return list;
+}
+
+function connectEth(){
+  setStatus('s1-status', '');
+  $('wallet-list').innerHTML = '';
+  const wallets = availableWallets();
+  if(!wallets.length){
+    setStatus('s1-status', 'No Ethereum wallet found. Install MetaMask, Rabby or similar and reload.', true);
+    return;
+  }
+  if(wallets.length === 1) return connectWith(wallets[0]);
+
+  // Several wallets installed: let the user pick.
+  wallets.forEach(w => {
+    const b = document.createElement('button');
+    if(w.info.icon){
+      const img = document.createElement('img');
+      img.src = w.info.icon; img.alt = '';
+      b.appendChild(img);
+    }
+    b.appendChild(document.createTextNode(w.info.name));
+    b.onclick = () => connectWith(w);
+    $('wallet-list').appendChild(b);
+  });
+}
+
+async function ensureChain(raw){
+  const want = hexOf(CONFIG.chainId);
+  const have = await raw.request({ method:'eth_chainId' });
+  if(have.toLowerCase() === want) return;
+  try{
+    await raw.request({ method:'wallet_switchEthereumChain', params:[{ chainId: want }] });
+  }catch(e){
+    throw new Error('Switch your wallet to ' + CONFIG.chainName + ' and try again.');
+  }
+}
+
+async function connectWith(w){
+  $('wallet-list').innerHTML = '';
+  setStatus('s1-status', '<span class="dot"></span>Waiting for wallet…');
+  try{
+    const raw = w.provider;
+    await raw.request({ method:'eth_requestAccounts' });
+    await ensureChain(raw);
+    // Create the provider only after the chain is right, so ethers doesn't see a network change.
+    ethProvider = new ethers.BrowserProvider(raw);
+    ethSigner = await ethProvider.getSigner();
+    ethAddr = await ethSigner.getAddress();
+
+    if(raw.on){
+      raw.on('accountsChanged', onWalletChanged);
+      raw.on('chainChanged', onWalletChanged);
+    }
+    $('s2-wallet').textContent = short(ethAddr) + ' · ' + CONFIG.chainName;
+    setStatus('s1-status', '');
+    goToStep(2);
+    checkEns();
+  }catch(e){
+    setStatus('s1-status', esc(e.code === 4001 ? 'Connection rejected.' : (e.shortMessage || e.message || 'Could not connect.')), true);
+  }
+}
+
+function onWalletChanged(){
+  // Before a proof is sent, a changed account/network invalidates the connection. Afterwards, ignore.
+  if(current <= 2){
+    ethAddr = ethProvider = ethSigner = null;
+    goToStep(1);
+    setStatus('s1-status', 'Wallet changed — connect again.');
+  }
+}
+
+function skipToClaim(){
+  goToStep(4);
+}
+
+/* ------------------------------------------------------------------ *
+ * Step 2 — prove ownership (real L1 call)
+ * ------------------------------------------------------------------ */
+let busy = false;
+
+function normalizedName(){
+  try{
+    const n = ethers.ensNormalize($('ens-input').value.trim());
+    return n.length >= 3 && n.includes('.') ? n : null;
+  }catch(_){ return null; }
+}
+
+function checkEns(){
+  $('prove-btn').disabled = busy || !normalizedName();
+}
+
+// PLACEHOLDER: the real secretHash is Aztec's Poseidon2 secret hash (aztec.js computeSecretHash).
+// Until the Aztec wallet is wired in, we send a keccak-derived 248-bit value so the L1 flow can be tested.
+// Messages sent with this placeholder can NOT be consumed on L2.
+function newSecret(){
+  const s = ethers.hexlify(ethers.randomBytes(31)); // 31 bytes always fits in a Field
+  const h = ethers.zeroPadValue(ethers.dataSlice(ethers.keccak256(s), 1), 32);
+  return { secret: s, secretHash: h };
+}
+
+function readableError(e){
+  const name = e.revert && e.revert.name;
+  if(name && ERRORS[name]) return ERRORS[name];
+  if(e.code === 'ACTION_REJECTED' || e.code === 4001) return 'Transaction rejected in wallet.';
+  return e.shortMessage || e.reason || e.message || 'Something went wrong.';
+}
+
+async function proveOwnership(){
+  const name = normalizedName();
+  if(!name) return;
+  busy = true;
+  $('prove-btn').disabled = true;
+  $('ens-input').disabled = true;
+  const fail = msg => {
+    busy = false;
+    $('ens-input').disabled = false;
+    checkEns();
+    setStatus('s2-status', esc(msg), true);
+  };
+
+  try{
+    // 1) Check-only mode: no contract configured, resolve with ethers and stop before sending anything.
+    if(!CONFIG.contract){
+      setStatus('s2-status', '<span class="dot"></span>Checking name…');
+      const resolved = await ethProvider.resolveName(name);
+      if(!resolved) return fail('This name has no address record on ' + CONFIG.chainName + '.');
+      if(resolved.toLowerCase() !== ethAddr.toLowerCase()){
+        return fail('This name resolves to ' + short(resolved) + ', not to your connected wallet.');
+      }
+      setStatus('s2-status', 'Name resolves to your wallet. Set CONFIG.contract to send the proof to L1.');
+      busy = false;
+      $('ens-input').disabled = false;
+      checkEns();
+      return;
+    }
+
+    const c = new ethers.Contract(CONFIG.contract, ABI, ethSigner);
+
+    // 2) Preflight read through the contract (Universal Resolver), before asking the wallet to sign.
+    setStatus('s2-status', '<span class="dot"></span>Checking name…');
+    const resolved = await c.resolvedAddress(name);
+    if(resolved === ethers.ZeroAddress){
+      return fail('This name has no onchain address record. Offchain (CCIP-Read) names are not supported yet.');
+    }
+    if(resolved.toLowerCase() !== ethAddr.toLowerCase()){
+      return fail('This name resolves to ' + short(resolved) + '. Connect that wallet to prove it.');
+    }
+
+    // 3) Secret first, so it is visible (and copyable) before the tx is even signed.
+    const s = newSecret();
+    secret = s.secret;
+    $('secret-value').textContent = secret;
+    $('secret-value').classList.remove('empty');
+    $('claim-secret-input').value = secret;
+
+    // 4) Send the proof to L1.
+    setStatus('s2-status', '<span class="dot"></span>Confirm in your wallet…');
+    let tx;
+    try{
+      tx = await c.prove(name, s.secretHash);
+    }catch(e){
+      secret = null;
+      $('secret-value').textContent = 'not generated yet';
+      $('secret-value').classList.add('empty');
+      return fail(readableError(e));
+    }
+    const link = CONFIG.explorerTx + tx.hash;
+    setStatus('s2-status', '<span class="dot"></span>Confirming on L1… <a href="' + esc(link) + '" target="_blank" rel="noopener">' + esc(short(tx.hash)) + '</a>');
+    const receipt = await tx.wait();
+    if(!receipt || receipt.status !== 1) return fail('Transaction failed on L1.');
+
+    // 5) Keep the message coordinates: the L2 claim needs them to find the message.
+    lastProof = { name, txHash: tx.hash };
+    for(const log of receipt.logs){
+      if(log.address.toLowerCase() !== CONFIG.contract.toLowerCase()) continue;
+      try{
+        const p = c.interface.parseLog(log);
+        if(p && p.name === 'NameProven'){
+          lastProof.node = p.args.node;
+          lastProof.messageKey = p.args.messageKey;
+          lastProof.leafIndex = p.args.leafIndex.toString();
+        }
+      }catch(_){ /* not ours */ }
+    }
+    console.log('NoirName proof sent', lastProof);
+
+    goToStep(3);
+    setStatus('s3-status', 'Prototype: Aztec delivery is simulated.');
+    startWait();
+  }catch(e){
+    fail(readableError(e));
+  }
+}
+
+// fake 5s timer standing in for real Aztec-delivery polling later
+function startWait(){
+  let n = 5;
+  $('wait-count').textContent = n;
+  const iv = setInterval(()=>{
+    n -= 1;
+    $('wait-count').textContent = n;
+    if(n <= 0){
+      clearInterval(iv);
+      goToStep(4);
+    }
+  }, 1000);
+}
+
+function copySecret(){
+  if(!secret) return;
+  navigator.clipboard.writeText(secret);
+  const btn = document.querySelector('.copy');
+  const old = btn.textContent;
+  btn.textContent = 'Copied';
+  setTimeout(()=>btn.textContent = old, 1200);
+}
+
+/* ------------------------------------------------------------------ *
+ * Steps 4–6 — Aztec side, still mocked
+ * ------------------------------------------------------------------ */
+function connectAztec(){
+  aztecAddr = 'aztec:' + randHex(4).slice(2) + '…' + randHex(4).slice(2);
+  goToStep(5);
+}
+
+function claim(){
+  const status = $('s5-status');
+  status.innerHTML = '<span class="dot"></span>Generating private proof…';
+  setTimeout(()=>{
+    goToStep(6);
+  }, 1600);
+}
+
+function verify(){
+  $('verify-out').style.display = 'block';
+  $('back-btn').style.display = 'inline-block';
+}
+
+function resetApp(){
+  location.reload();
+}
+
+renderTrack();
+</script>
+</body>
+</html>
