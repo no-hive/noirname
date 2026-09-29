@@ -4,5 +4,11 @@
       "name": "v1.16.2",
       "rev": "bf647bd6046f2f7da30d0c2bf435e5c76a780c1b"
     }
+  },
+  "lib/l1-contracts": {
+    "tag": {
+      "name": "v5.2.0",
+      "rev": "cf65930b21bcc5b463caa8c842f5f13112207602"
+    }
   }
 }
