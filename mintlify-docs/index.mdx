@@ -1,24 +1,32 @@
 ---
 title: "About NoirName"
 sidebarTitle: "About"
-description: "Use an ENS name on Aztec without exposing the wallet behind each private action."
+description: "A prototype for using an ENS name in Aztec without acting from its public Ethereum wallet every time."
 ---
 
 # About NoirName
 
-NoirName connects ENS ownership on Ethereum with private use of a name on Aztec. A user proves ownership through a public L1 transaction, then claims a private record on Aztec using a secret.
+NoirName is a prototype that connects ENS ownership on Ethereum with a private claim on Aztec. A user publicly proves ownership of an ENS name through an Ethereum transaction, waits for a message to reach Aztec, and claims a private record using a secret. Aztec applications can then use the claim for name-based checks without requiring every later action from the owner's public Ethereum wallet.
 
 ## Why it exists
 
-ENS names are useful identities, but actions made directly from the owner's Ethereum wallet expose its public history. NoirName lets applications check a claimed name on Aztec without making every later action from that public wallet. This can support private membership, voting, donations, social features, and reputation.
+An ENS name can serve as an identity in an application, but activity from its owner's Ethereum wallet is publicly traceable. NoirName explores how to use a name for membership, voting, donations, social features, or reputation in Aztec while reducing the need to reuse that public wallet for later actions.
 
-The L1 ownership check is public. The design aims to keep later Aztec activity private; privacy depends on the final contracts and how applications use them.
+## Where it can lead
+
+NoirName is intended as a foundation for deeper projects built around identity on Aztec. A reusable link between an ENS name and a private claim could support richer identity systems, private donations, and coordination within DAOs. These are directions for future applications, not features delivered by the prototype.
+
+## What a claim means
+
+A claim shows that an ENS ownership check succeeded **at a particular time**. The record remains if the name is later transferred, expires, or ownership is otherwise lost; it does not by itself prove current ownership. Handling ENS name expiration is planned for after the MVP, with no fixed date yet. The original Ethereum transaction is public, and the privacy of later activity depends on the final contracts and how an application verifies and uses the claim. The verification interface is still being defined.
+
+For the step-by-step flow, component roles, and current design boundaries, read [Architecture](/architecture).
 
 ## Explore
 
 <CardGroup cols={2}>
   <Card title="Architecture" icon="diagram-project" href="/architecture">
-    Follow the proof from Ethereum to Aztec.
+    Follow the claim from Ethereum to Aztec and review its limits.
   </Card>
   <Card title="Guides" icon="code" href="/guides">
     Start with the contribution guide.
