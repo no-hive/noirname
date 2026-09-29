@@ -1,0 +1,2 @@
+[workspace]
+members = ["aztec-net-contracts_contract", "aztec-net-contracts_test"]
