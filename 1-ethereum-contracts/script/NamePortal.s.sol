@@ -1,18 +1,18 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+// SPDX-License-Identifier: Apache-2.0
+pragma solidity >=0.8.27;
 
 import {Script} from "forge-std/Script.sol";
-import {Counter} from "../src/Counter.sol";
+import {NamePortal} from "../src/NamePortal.sol";
 
 contract CounterScript is Script {
-    Counter public counter;
+    NamePortal public namePortal ;
 
     function setUp() public {}
 
     function run() public {
         vm.startBroadcast();
 
-        counter = new Counter();
+        namePortal = new NamePortal();
 
         vm.stopBroadcast();
     }
