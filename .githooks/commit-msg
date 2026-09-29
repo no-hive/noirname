@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Проверка формата Conventional Commits для первой строки сообщения коммита.
+first_line=$(head -n1 "$1")
+
+# merge/revert/fixup-коммиты пропускаем
+if echo "$first_line" | grep -qE '^(Merge|Revert|fixup!|squash!)'; then
+  exit 0
+fi
+
+types='feat|fix|docs|chore|refactor|perf|test|build|ci|style'
+scopes='eth-contracts|aztec-contracts|widget|docs'
+pattern="^(${types})(\((${scopes})\))?(!)?: .+$"
+
+if ! echo "$first_line" | grep -qE "$pattern"; then
+  cat >&2 << MSG
+
+✖ Сообщение коммита не соответствует Conventional Commits:
+    $first_line
+
+Формат:  <type>(<scope>): <описание>
+Types:   ${types//|/, }
+Scopes:  ${scopes//|/, }  (scope необязателен)
+Примеры: feat(widget): add claim step
+         fix(eth-contracts): check resolver address
+         docs: update quickstart
+         feat(aztec-contracts)!: change claim message format
+
+MSG
+  exit 1
+fi
