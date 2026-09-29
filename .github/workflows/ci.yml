@@ -1,0 +1,112 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      eth: ${{ steps.f.outputs.eth }}
+      aztec: ${{ steps.f.outputs.aztec }}
+      widget: ${{ steps.f.outputs.widget }}
+      docs: ${{ steps.f.outputs.docs }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: f
+        with:
+          filters: |
+            eth:
+              - '1-ethereum-contracts/**'
+              - '.github/workflows/ci.yml'
+            aztec:
+              - '2-aztec-net-contracts/**'
+              - '.github/workflows/ci.yml'
+            widget:
+              - '3-dapp-widget/**'
+              - '.github/workflows/ci.yml'
+            docs:
+              - 'mintlify-docs/**'
+              - '.github/workflows/ci.yml'
+
+  eth:
+    needs: changes
+    if: needs.changes.outputs.eth == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: 1-ethereum-contracts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: foundry-rs/foundry-toolchain@v1
+      - run: forge fmt --check
+      - run: forge build
+      - run: forge test
+
+  aztec:
+    needs: changes
+    if: needs.changes.outputs.aztec == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: 2-aztec-net-contracts
+    steps:
+      - uses: actions/checkout@v4
+      # TODO: установить нужную (запиненную) версию Aztec / nargo
+      - run: nargo fmt --check
+      - run: nargo compile
+      - run: nargo test
+
+  widget:
+    needs: changes
+    if: needs.changes.outputs.widget == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: 3-dapp-widget
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: 3-dapp-widget/package-lock.json
+      - run: npm ci
+      - run: npm run lint --if-present
+      - run: npx tsc --noEmit
+      - run: npm test --if-present
+      - run: npm run build
+
+  docs:
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mintlify-docs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npx mint broken-links
+
+  # Единственная required-проверка для branch protection.
+  gate:
+    if: always()
+    needs: [changes, eth, aztec, widget, docs]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" || "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "Some jobs failed or were cancelled"
+            exit 1
+          fi

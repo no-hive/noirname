@@ -1,0 +1,15 @@
+{
+  "plugins": [
+    {
+      "type": "linked-versions",
+      "groupName": "noirname",
+      "components": ["eth-contracts", "aztec-contracts", "widget"]
+    }
+  ],
+  "packages": {
+    "1-ethereum-contracts": { "release-type": "simple", "component": "eth-contracts" },
+    "2-aztec-net-contracts": { "release-type": "simple", "component": "aztec-contracts" },
+    "3-dapp-widget": { "release-type": "node", "component": "widget" },
+    "mintlify-docs": { "release-type": "simple", "component": "docs" }
+  }
+}
