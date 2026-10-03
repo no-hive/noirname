@@ -5,7 +5,7 @@ import {Script} from "forge-std/Script.sol";
 import {NamePortal} from "../src/NamePortal.sol";
 
 contract CounterScript is Script {
-    NamePortal public namePortal ;
+    NamePortal public namePortal;
 
     function setUp() public {}
 
