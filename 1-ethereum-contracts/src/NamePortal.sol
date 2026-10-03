@@ -17,9 +17,14 @@ interface INameWrapper {
 
 contract NamePortal {
     error NotNameOwner();
+    error AlreadyInitialized();
+    error NotDeployer();
 
     IENSRegistry public constant REGISTRY = IENSRegistry(0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e);
     INameWrapper public constant WRAPPER = INameWrapper(0xD4416b13d2b3a9aBae7AcD5D6C2BbDBE25686401);
+
+    address public immutable deployer;
+    bool public isInitialized;
 
     IRegistry public registry;
     bytes32 public l2Bridge;
@@ -28,7 +33,15 @@ contract NamePortal {
     IInbox public inbox;
     uint256 public rollupVersion;
 
+    constructor() {
+        deployer = msg.sender;
+    }
+
     function initialize(address _registry, bytes32 _l2Bridge) external {
+        if (msg.sender != deployer) revert NotDeployer();
+        if (isInitialized) revert AlreadyInitialized();
+        isInitialized = true;
+
         registry = IRegistry(_registry);
         l2Bridge = _l2Bridge;
 
